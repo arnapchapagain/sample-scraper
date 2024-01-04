@@ -1,7 +1,7 @@
 import csv
 import json
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, fields, asdict
 from aiohttp import ClientSession, ClientResponseError
 from bs4 import BeautifulSoup
 
@@ -17,8 +17,25 @@ class Product:
     title: str
     image: str
     price: str
+    sku: str
     short_description: str
+    description: str
+    cateogory: str
     additional: list[AdditionalInfo] | None
+
+
+def save_to_json(data: list[Product]):
+    with open("products.json", "w", encoding="utf-8") as file:
+        json.dump([asdict(product) for product in data], file, indent=4, ensure_ascii=False)
+
+
+def save_to_csv(data: list[Product]):
+    with open("products.csv", "w", encoding="utf-8") as file:
+        headers = [header.name for header in fields(Product)]
+        writer = csv.DictWriter(file, headers)
+        writer.writeheader()
+        for product in data:
+            writer.writerow(asdict(product))
 
 
 async def get_html(client: ClientSession, url: str) -> BeautifulSoup:
@@ -32,10 +49,11 @@ async def get_html(client: ClientSession, url: str) -> BeautifulSoup:
 
 async def main():
     url = "https://gopher1.extrkt.com/"
+    products = []
     async with ClientSession(raise_for_status=True) as client:
         html = await get_html(client, url)
-        products = html.select("a.woocommerce-loop-product__link")
-        product_links = [product.get("href") for product in products]
+        product_info = html.select("a.woocommerce-loop-product__link")
+        product_links = [product.get("href") for product in product_info]
             
         
         for product_link in product_links:
@@ -44,7 +62,10 @@ async def main():
                 title = product_page.select_one("h1.product_title").text,
                 image = product_page.select_one("div.woocommerce-product-gallery__image > a").get("href"),
                 price = product_page.select_one("span.amount > bdi").text,
-                short_description  = product_page.select_one("div.woocommerce-product-details__short-description > p").text,
+                short_description  = product_page.select_one("div.woocommerce-product-details__short-description > p").text.strip(),
+                description = product_page.select_one("div#tab-description").text.replace("Description", "").strip(),
+                sku = product_page.select_one("span.sku").text,
+                cateogory=product_page.select_one("span.posted_in").text.replace("Category: ", ""),
                 additional=[]
             )
             
@@ -56,7 +77,11 @@ async def main():
                     values = [value.text for value in tr.select("td > select > option") if value.text != "Choose an option"]
                 ))
             
-
+            print(product)
+            products.append(product)
+            
+    save_to_json(products)
+    save_to_csv(products)
 
 if __name__ == "__main__":
     asyncio.run(main())
