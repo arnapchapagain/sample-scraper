@@ -45,10 +45,12 @@ def append_to_json(data: Product):
 
 def append_to_csv(product: Product):
     with open("products.csv", "a", encoding="utf-8") as file:
+        # Get all the fields except the "additional" field
         writer = csv.DictWriter(file, fieldnames=csv_headers)
-        writer.writerow(asdict(product))
+        product_dict = asdict(product)
+        product_dict.pop("additional")
+        writer.writerow(product_dict)
             
-
 
 async def get_html(client: ClientSession, url: str, **kwargs) -> BeautifulSoup:
     headers = {
@@ -58,6 +60,20 @@ async def get_html(client: ClientSession, url: str, **kwargs) -> BeautifulSoup:
         response = await request.text()
         return BeautifulSoup(response, "html.parser")
         
+
+def get_text(element: BeautifulSoup, css_selector: str, default_value: None) -> str:
+    try:
+        return element.select_one(css_selector).text.strip()
+    except AttributeError:
+        return default_value
+
+
+def get_image(element: BeautifulSoup, css_selector: str, default_value: None) -> str:
+    try:
+        return element.select_one(css_selector).get("href")
+    except AttributeError:
+        return default_value
+
 
 async def scrape_page(client: ClientSession, url: str, **kwargs):
     html = await get_html(client, url, **kwargs)
@@ -71,14 +87,14 @@ async def scrape_page(client: ClientSession, url: str, **kwargs):
     for task in asyncio.as_completed(tasks):
         product_page = await task
         product = Product(
-            title = product_page.select_one("h1.product_title").text,
-            image = product_page.select_one("div.woocommerce-product-gallery__image > a").get("href"),
-            price = product_page.select_one("span.amount > bdi").text,
-            short_description  = product_page.select_one("div.woocommerce-product-details__short-description > p").text.strip(),
-            description = product_page.select_one("div#tab-description").text.replace("Description", "").strip(),
-            sku = product_page.select_one("span.sku").text,
-            cateogory=product_page.select_one("span.posted_in").text.replace("Category: ", ""),
-            additional=[]
+            title = get_text(product_page, "h1.product_title", None),
+            image = get_image(product_page, "div.woocommerce-product-gallery__image > a", None),
+            price = get_text(product_page, "span.amount > bdi", None),
+            short_description = get_text(product_page, "div.woocommerce-product-details__short-description > p", None),
+            description = get_text(product_page, "div#tab-description", None),
+            sku = get_text(product_page, "span.sku", None),
+            cateogory = get_text(product_page, "span.posted_in", None).replace("Category: ", ""),
+            additional = []
         )
         
         tr_tags = product_page.select("table.variations > tbody > tr")
@@ -113,13 +129,13 @@ async def main():
                 break
 
 if __name__ == "__main__":
-    csv_headers = [header.name for header in fields(Product)]
-    csv_headers.pop(-1) # Removing the additional field
-    for header in fields(AdditionalInfo):
-        csv_headers.append("additional_" + header.name)
+    with open("products.json", "w", encoding="utf-8") as file:
+        file.write("[]")
     
     with open("products.csv", "w", encoding="utf-8") as file:
-        csv_writer = csv.DictWriter(file, csv_headers)
+        csv_headers = [header.name for header in fields(Product) if header.name != "additional"] 
+        csv_writer = csv.DictWriter(file, fieldnames=csv_headers)
         csv_writer.writeheader()
-    
+        del csv_writer
+        
     asyncio.run(main())
