@@ -44,10 +44,8 @@ def append_to_json(data: Product):
 
 
 def append_to_csv(data: list[Product]):
-    with open("products.csv", "w", encoding="utf-8") as file:
-        headers = [header.name for header in fields(Product)]
-        writer = csv.DictWriter(file, headers)
-        writer.writeheader()
+    with open("products.csv", "a", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=csv_headers)
         for product in data:
             writer.writerow(asdict(product))
 
@@ -119,7 +117,7 @@ if __name__ == "__main__":
     csv_headers = [header.name for header in fields(Product)]
     csv_headers.pop(-1) # Removing the additional field
     for header in fields(AdditionalInfo):
-        csv_headers.append(header.name)
+        csv_headers.append("additional_" + header.name)
     
     with open("products.csv", "w", encoding="utf-8") as file:
         csv_writer = csv.DictWriter(file, csv_headers)
