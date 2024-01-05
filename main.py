@@ -6,7 +6,6 @@ from dataclasses import dataclass, fields, asdict
 from aiohttp import ClientSession, ClientResponseError
 from bs4 import BeautifulSoup
 
-
 @dataclass
 class AdditionalInfo:
     label: str | list[str]
@@ -25,12 +24,26 @@ class Product:
     additional: list[AdditionalInfo] | None
 
 
-def save_to_json(data: list[Product]):
-    with open("products.json", "w", encoding="utf-8") as file:
-        json.dump([asdict(product) for product in data], file, indent=4, ensure_ascii=False)
+def append_to_json(data: Product):
+    with open("products.json", "r+", encoding="utf-8") as file:
+        try:
+            file.seek(0) # Go to the start of the file
+            json_data = json.load(file)  # Load existing data
+            json_data.append(asdict(data))  # Append new data
+
+            file.seek(0)  # Go back to the start of the file
+            file.truncate()  # Truncate the file to overwrite
+            json.dump(json_data, file, indent=4, ensure_ascii=False)
+
+        except json.JSONDecodeError:
+            # If the file is empty or the JSON is invalid, overwrite with new data
+            file.seek(0)
+            file.truncate()  # Clear the file before writing
+            json.dump([asdict(data)], file, indent=4, ensure_ascii=False)
+            
 
 
-def save_to_csv(data: list[Product]):
+def append_to_csv(data: list[Product]):
     with open("products.csv", "w", encoding="utf-8") as file:
         headers = [header.name for header in fields(Product)]
         writer = csv.DictWriter(file, headers)
@@ -99,8 +112,17 @@ async def main():
                 print("Page limit reached")
                 break
             
-    save_to_json(products)
-    save_to_csv(products)
+    # save_to_json(products)
+    # save_to_csv(products)
 
 if __name__ == "__main__":
+    csv_headers = [header.name for header in fields(Product)]
+    csv_headers.pop(-1) # Removing the additional field
+    for header in fields(AdditionalInfo):
+        csv_headers.append(header.name)
+    
+    with open("products.csv", "w", encoding="utf-8") as file:
+        csv_writer = csv.DictWriter(file, csv_headers)
+        csv_writer.writeheader()
+    
     asyncio.run(main())
