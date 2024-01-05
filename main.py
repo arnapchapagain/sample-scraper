@@ -43,11 +43,11 @@ def append_to_json(data: Product):
             
 
 
-def append_to_csv(data: list[Product]):
+def append_to_csv(product: Product):
     with open("products.csv", "a", encoding="utf-8") as file:
         writer = csv.DictWriter(file, fieldnames=csv_headers)
-        for product in data:
-            writer.writerow(asdict(product))
+        writer.writerow(asdict(product))
+            
 
 
 async def get_html(client: ClientSession, url: str, **kwargs) -> BeautifulSoup:
@@ -103,15 +103,14 @@ async def main():
                 async for product in scrape_page(client, url, paged=page):
                     products.append(product)
                     pprint(product)
+                    append_to_json(product)
+                    append_to_csv([product])
                     
                 page += 1
                 
             except ClientResponseError as e:
                 print("Page limit reached")
                 break
-            
-    # save_to_json(products)
-    # save_to_csv(products)
 
 if __name__ == "__main__":
     csv_headers = [header.name for header in fields(Product)]
