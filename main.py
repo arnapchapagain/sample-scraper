@@ -104,7 +104,7 @@ async def main():
                     products.append(product)
                     pprint(product)
                     append_to_json(product)
-                    append_to_csv([product])
+                    append_to_csv(product)
                     
                 page += 1
                 
